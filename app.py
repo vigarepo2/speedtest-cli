@@ -21,14 +21,14 @@ def speedtest():
         process = subprocess.Popen(['speedtest-cli', '--json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if stderr:
-          return jsonify({'error': stderr.decode()})
+            return jsonify({'error': stderr.decode()})
         output = json.loads(stdout.decode())
         download = output.get('download') / 1000000 if output.get('download') else None
         upload = output.get('upload') / 1000000 if output.get('upload') else None
         ping = output.get('ping')
 
         if download is None or upload is None or ping is None:
-          return jsonify({'error': 'Could not retrieve all speed test data.'})
+            return jsonify({'error': 'Could not retrieve all speed test data.'})
 
         return jsonify({'download': download, 'upload': upload, 'ping': ping})
     except FileNotFoundError:

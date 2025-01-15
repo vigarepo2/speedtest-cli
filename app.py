@@ -1,107 +1,115 @@
-import subprocess
-import json
-from flask import Flask, render_template_string, jsonify
+import socket
+import psutil
+import platform
+from flask import Flask, render_template_string
 
 app = Flask(__name__)
 
-@app.after_request
-def after_request(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-    return response
-
 @app.route('/')
 def index():
-    return render_template_string("""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Speed Test</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <style>
-        body {font-family: sans-serif; margin: 20px;}
-        .speedtest-container {max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; text-align: center;}
-        .speedtest-button {background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;}
-        .speedtest-results {margin-top: 20px;}
-        .speedtest-results h2 {font-size: 18px; margin-bottom: 10px;}
-        .speedtest-results .result {display: flex; justify-content: space-between; margin-bottom: 10px;}
-        #loading {display: none;}
-        .spinner-border{margin: 10px auto;}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="speedtest-container">
-            <h1>Website Speed Test</h1>
-            <button class="speedtest-button" id="speedtest-btn">Run Speed Test</button>
-            <div id="loading" class="text-center">
-              <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
+    # Server details
+    hostname = socket.gethostname()
+    try:
+        server_ip = socket.gethostbyname(hostname)
+    except socket.gaierror:
+        server_ip = "Could not resolve hostname."
+    operating_system = platform.system() + ' ' + platform.release()
+    cpu_percent = psutil.cpu_percent()
+    cpu_count = psutil.cpu_count(logical=False)
+    cpu_threads = psutil.cpu_count()
+    total_memory = psutil.virtual_memory().total / (1024 ** 3)  # GB
+    available_memory = psutil.virtual_memory().available / (1024 ** 3)
+    memory_percent = psutil.virtual_memory().percent
+    disk_usage = psutil.disk_usage('/').percent
+    disk_total = psutil.disk_usage('/').total / (1024**3)
+    disk_used = psutil.disk_usage('/').used / (1024**3)
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Server Dashboard</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        <style>
+            body {{ background-color: #f8f9fa; }}
+            .dashboard-container {{ margin-top: 50px; }}
+            .card {{ border: none; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); }}
+            .card-header {{ background-color: #ffffff; border-bottom: 1px solid #eee; font-weight: 600; }}
+            .icon {{ font-size: 2em; margin-right: 10px; color: #007bff; }}
+            .progress {{height: 25px;}}
+            .progress-bar {{
+                background-color: #007bff;
+                color: white;
+                font-weight: bold;
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container dashboard-container">
+            <h1 class="mb-4 text-center">Server Dashboard</h1>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header"><i class="fas fa-server icon"></i>Server Information</div>
+                        <div class="card-body">
+                            <p><strong>Hostname:</strong> {hostname}</p>
+                            <p><strong>Server IP:</strong> {server_ip}</p>
+                            <p><strong>Operating System:</strong> {operating_system}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header"><i class="fas fa-microchip icon"></i>CPU Usage</div>
+                        <div class="card-body">
+                            <p><strong>CPU Usage:</strong> {cpu_percent:.1f}%</p>
+                            <p><strong>CPU Cores:</strong> {cpu_count}</p>
+                            <p><strong>CPU Threads:</strong> {cpu_threads}</p>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {cpu_percent:.1f}%;" aria-valuenow="{cpu_percent:.1f}" aria-valuemin="0" aria-valuemax="100">{cpu_percent:.1f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header"><i class="fas fa-memory icon"></i>Memory Usage</div>
+                        <div class="card-body">
+                            <p><strong>Total Memory:</strong> {total_memory:.2f} GB</p>
+                            <p><strong>Available Memory:</strong> {available_memory:.2f} GB</p>
+                            <p><strong>Memory Usage:</strong> {memory_percent:.1f}%</p>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {memory_percent:.1f}%;" aria-valuenow="{memory_percent:.1f}" aria-valuemin="0" aria-valuemax="100">{memory_percent:.1f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header"><i class="fas fa-hdd icon"></i>Disk Usage (Root Partition)</div>
+                        <div class="card-body">
+                            <p><strong>Total Disk Space:</strong> {disk_total:.2f} GB</p>
+                            <p><strong>Used Disk Space:</strong> {disk_used:.2f} GB</p>
+                            <p><strong>Disk Usage:</strong> {disk_usage:.1f}%</p>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {disk_usage:.1f}%;" aria-valuenow="{disk_usage:.1f}" aria-valuemin="0" aria-valuemax="100">{disk_usage:.1f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="speedtest-results" id="speedtest-results"></div>
-    </div>
-    <script>
-        document.getElementById('speedtest-btn').addEventListener('click', async () => {
-            document.getElementById("loading").style.display = "block";
-            document.getElementById("speedtest-results").innerHTML = "";
-            try {
-                const response = await fetch('/speedtest', { method: 'POST' });
-                if (!response.ok) { throw new Error('Speed test failed.'); }
-                const data = await response.json();
-                document.getElementById("loading").style.display = "none";
-                const resultsDiv = document.getElementById('speedtest-results');
-                if (data.error) { resultsDiv.innerHTML = `<p class="text-danger">${data.error}</p>`; return; }
-                resultsDiv.innerHTML = `<h2>Speed Test Results</h2><div class="result"><p>Download Speed:</p><span>${data.download}</span></div><div class="result"><p>Upload Speed:</p><span>${data.upload}</span></div><div class="result"><p>Ping:</p><span>${data.ping}</span></div>`;
-            } catch (error) {
-                console.error('Speed test error:', error);
-                document.getElementById("loading").style.display = "none";
-                const resultsDiv = document.getElementById('speedtest-results');
-                resultsDiv.innerHTML = '<p class="text-danger">Speed test failed. Please try again later.</p>';
-            }
-        });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-</body>
-</html>
-""")
-
-@app.route('/speedtest', methods=['POST'])
-def speedtest():
-    try:
-        process = subprocess.Popen(['speedtest-cli', '--json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-
-        if stderr:
-            return jsonify({'error': stderr.decode()})
-
-        output = json.loads(stdout.decode())
-
-        download = output.get('download') / 1000000 if output.get('download') else None
-        upload = output.get('upload') / 1000000 if output.get('upload') else None
-        ping = output.get('ping')
-
-        if download is None or upload is None or ping is None:
-            return jsonify({'error': 'Could not retrieve all speed test data.'})
-
-        formatted_results = {
-            'download': f'{download:.2f} Mbps',
-            'upload': f'{upload:.2f} Mbps',
-            'ping': f'{ping:.2f} ms'
-        }
-
-        return jsonify(formatted_results)
-
-    except FileNotFoundError:
-        return jsonify({'error': 'speedtest-cli is not installed. Please install it on the server.'})
-
-    except Exception as e:
-        print(f'An unexpected error occurred: {str(e)}')
-        return jsonify({'error': 'An error occurred during the speed test.'})
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    """
+    return render_template_string(html_content, hostname=hostname, server_ip=server_ip, operating_system=operating_system, cpu_percent=cpu_percent, cpu_count=cpu_count, cpu_threads=cpu_threads, total_memory=total_memory, available_memory=available_memory, memory_percent=memory_percent, disk_usage=disk_usage, disk_total=disk_total, disk_used=disk_used)
 
 if __name__ == '__main__':
     app.run(debug=True)

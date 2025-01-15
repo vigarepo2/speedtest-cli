@@ -1,18 +1,42 @@
 import socket
 import psutil
 import platform
+import time
+import requests
 from flask import Flask, render_template_string
 
 app = Flask(__name__)
+
+def get_external_ip():
+    """Fetches the server's external IP address using an external service."""
+    try:
+        url = "https://api.ipify.org"  # Using ipify for external IP
+        response = requests.get(url, timeout=5) #Added timeout to prevent indefinite hanging
+        if response.status_code == 200:
+            return response.text.strip()
+        else:
+            return f"Error fetching external IP: Status Code {response.status_code}"
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching external IP: {e}"
+
+def get_uptime():
+    """Calculates and formats system uptime."""
+    uptime_seconds = time.time() - psutil.boot_time()
+    days = int(uptime_seconds // (24 * 3600))
+    hours = int((uptime_seconds % (24 * 3600)) // 3600)
+    minutes = int((uptime_seconds % 3600) // 60)
+    seconds = int(uptime_seconds % 60)
+    return f"{days} days, {hours} hours, {minutes} minutes, {seconds} seconds"
 
 @app.route('/')
 def index():
     # Server details
     hostname = socket.gethostname()
     try:
-        server_ip = socket.gethostbyname(hostname)
+        internal_ip = socket.gethostbyname(hostname)
     except socket.gaierror:
-        server_ip = "Could not resolve hostname."
+        internal_ip = "Could not resolve hostname."
+    external_ip = get_external_ip()
     operating_system = platform.system() + ' ' + platform.release()
     cpu_percent = psutil.cpu_percent()
     cpu_count = psutil.cpu_count(logical=False)
@@ -23,6 +47,7 @@ def index():
     disk_usage = psutil.disk_usage('/').percent
     disk_total = psutil.disk_usage('/').total / (1024**3)
     disk_used = psutil.disk_usage('/').used / (1024**3)
+    uptime = get_uptime()
 
     html_content = f"""
     <!DOCTYPE html>
@@ -39,7 +64,7 @@ def index():
             .card {{ border: none; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); }}
             .card-header {{ background-color: #ffffff; border-bottom: 1px solid #eee; font-weight: 600; }}
             .icon {{ font-size: 2em; margin-right: 10px; color: #007bff; }}
-            .progress {{height: 25px;}}
+            .progress {{ height: 25px; }}
             .progress-bar {{
                 background-color: #007bff;
                 color: white;
@@ -57,8 +82,10 @@ def index():
                         <div class="card-header"><i class="fas fa-server icon"></i>Server Information</div>
                         <div class="card-body">
                             <p><strong>Hostname:</strong> {hostname}</p>
-                            <p><strong>Server IP:</strong> {server_ip}</p>
+                            <p><strong>Internal IP:</strong> {internal_ip}</p>
+                            <p><strong>External IP:</strong> {external_ip}</p>
                             <p><strong>Operating System:</strong> {operating_system}</p>
+                            <p><strong>Uptime:</strong> {uptime}</p>
                         </div>
                     </div>
                 </div>
@@ -109,7 +136,7 @@ def index():
     </body>
     </html>
     """
-    return render_template_string(html_content, hostname=hostname, server_ip=server_ip, operating_system=operating_system, cpu_percent=cpu_percent, cpu_count=cpu_count, cpu_threads=cpu_threads, total_memory=total_memory, available_memory=available_memory, memory_percent=memory_percent, disk_usage=disk_usage, disk_total=disk_total, disk_used=disk_used)
+    return render_template_string(html_content, hostname=hostname, internal_ip=internal_ip, external_ip=external_ip, operating_system=operating_system, cpu_percent=cpu_percent, cpu_count=cpu_count, cpu_threads=cpu_threads, total_memory=total_memory, available_memory=available_memory, memory_percent=memory_percent, disk_usage=disk_usage, disk_total=disk_total, disk_used=disk_used, uptime=uptime)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0") # Make it accessible externally.
